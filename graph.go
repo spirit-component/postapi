@@ -2,6 +2,7 @@ package postapi
 
 import (
 	"fmt"
+	"github.com/go-spirit/spirit/worker/fbp"
 	"strings"
 	"sync"
 
@@ -9,25 +10,25 @@ import (
 	"github.com/gogap/config"
 )
 
-type Graph struct {
-	Errors []*protocol.Port
-	Ports  []*protocol.Port
+type postAPIPorts struct {
+	Error  []*protocol.Port
+	Normal []*protocol.Port
 }
 
 type GraphProvider interface {
 	WithFallback(config.Configuration) error
-	Query(apiName string) (Graph, bool)
+	Query(apiName string) (map[string]*protocol.Graph, bool)
 }
 
 type defaultGraphProvider struct {
-	graphs map[string]Graph
+	graphs map[string]*postAPIPorts
 
 	locker sync.Mutex
 }
 
 func newDefaultGraphProvider(conf config.Configuration) (graphProvider GraphProvider, err error) {
 	provider := &defaultGraphProvider{
-		graphs: make(map[string]Graph),
+		graphs: make(map[string]*postAPIPorts),
 	}
 
 	err = provider.loadGraph(conf, false)
@@ -41,9 +42,28 @@ func newDefaultGraphProvider(conf config.Configuration) (graphProvider GraphProv
 	return
 }
 
-func (p *defaultGraphProvider) Query(apiName string) (Graph, bool) {
+func (p *defaultGraphProvider) Query(apiName string) (map[string]*protocol.Graph, bool) {
 	g, exist := p.graphs[apiName]
-	return g, exist
+
+	if !exist {
+		return nil, false
+	}
+
+	graphs := make(map[string]*protocol.Graph)
+
+	graphs[fbp.GraphNameOfNormal] = &protocol.Graph{
+		Seq:   1,
+		Name:  fbp.GraphNameOfNormal,
+		Ports: g.Normal,
+	}
+
+	graphs[fbp.GraphNameOfError] = &protocol.Graph{
+		Seq:   1,
+		Name:  fbp.GraphNameOfError,
+		Ports: g.Error,
+	}
+
+	return graphs, true
 }
 
 func (p *defaultGraphProvider) WithFallback(conf config.Configuration) error {
@@ -65,7 +85,7 @@ func (p *defaultGraphProvider) loadGraph(conf config.Configuration, fallback boo
 	p.locker.Lock()
 	defer p.locker.Unlock()
 
-	var graphs = make(map[string]Graph)
+	var graphs = make(map[string]*postAPIPorts)
 
 	for _, apiKey := range apiNames {
 		apiName := strings.Replace(apiKey, "-", ".", -1)
@@ -95,24 +115,30 @@ func (p *defaultGraphProvider) loadGraph(conf config.Configuration, fallback boo
 			return
 		}
 
-		portsConfig := graphConf.GetConfig("ports")
+		portsConfig := graphConf.GetConfig("normal")
 
-		var ports []*protocol.Port
-		ports, err = p.configToPorts(apiKey, portsConfig)
+		var normalPorts []*protocol.Port
+		normalPorts, err = p.configToPorts(apiKey, portsConfig)
 
 		if err != nil {
 			return
 		}
 
-		graphs[apiName] = Graph{
-			Errors: errorPorts,
-			Ports:  ports,
+		for _, port := range errorPorts {
+			port.GraphName = fbp.GraphNameOfError
+		}
+
+		for _, port := range normalPorts {
+			port.GraphName = fbp.GraphNameOfNormal
+		}
+
+		graphs[apiName] = &postAPIPorts{
+			Error:  errorPorts,
+			Normal: normalPorts,
 		}
 	}
 
 	p.graphs = graphs
-
-	fmt.Println(graphs)
 
 	return
 }

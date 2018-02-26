@@ -102,9 +102,7 @@ func (p *PostAPI) serve(c *gin.Context) {
 
 	apiName := c.GetHeader("X-Api")
 
-	fmt.Println(string(body))
-
-	graph, exist := p.graphs.Query(apiName)
+	graphs, exist := p.graphs.Query(apiName)
 
 	if !exist {
 		c.JSON(http.StatusNotFound,
@@ -117,23 +115,26 @@ func (p *PostAPI) serve(c *gin.Context) {
 		return
 	}
 
-	id := uuid.NewUUID()
+	id := uuid.New()
 	payload := &protocol.Payload{
-		Id:        id.String(),
-		Timestamp: time.Now().UnixNano(),
-		Graph: &protocol.Graph{
-			Seq:    1,
-			Errors: graph.Errors,
-			Ports:  graph.Ports,
-		},
+		Id:           id,
+		Timestamp:    time.Now().UnixNano(),
+		CurrentGraph: fbp.GraphNameOfNormal,
+		Graphs:       graphs,
 		Message: &protocol.Message{
-			Id:     id.String(),
+			Id:     id,
 			Header: map[string]string{"content-type": "application/json"},
 			Body:   body,
 		},
 	}
 
-	port, err := payload.GetGraph().CurrentPort()
+	graph, exist := payload.GetGraph(fbp.GraphNameOfNormal)
+	if !exist {
+		err = fmt.Errorf("api graph of %s, did not exist normal graph", apiName)
+		return
+	}
+
+	port, err := graph.CurrentPort()
 
 	if err != nil {
 		return
@@ -152,13 +153,15 @@ func (p *PostAPI) serve(c *gin.Context) {
 
 	// if wait {
 
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
 	doneChan = make(chan struct{})
 	defer close(doneChan)
 
-	session.WithValue(ctxHttpComponentKey{}, &httpCacheItem{c, ctx, doneChan})
+	// session.WithValue(ctxHttpComponentKey{}, &httpCacheItem{c, ctx, doneChan})
+
+	p.opts.Cache.Set(p.cacheKey(id), &httpCacheItem{c, ctx, doneChan})
 
 	// } else {
 	// 	session.WithValue(ctxHttpComponentKey{}, &httpCacheItem{c, nil, nil})
@@ -173,7 +176,7 @@ func (p *PostAPI) serve(c *gin.Context) {
 		logrus.WithField("component", "post-api").
 			WithField("from", session.From()).
 			WithField("to", session.To()).
-			WithField("seq", payload.GetGraph().GetSeq()).
+			WithField("seq", graph.GetSeq()).
 			WithError(err).Errorln("post user message failure")
 		return
 	}
@@ -203,49 +206,55 @@ func (p *PostAPI) serve(c *gin.Context) {
 
 }
 
-func (p *PostAPI) Handler() worker.HandlerFunc {
-	return func(session mail.Session) (err error) {
+func (p *PostAPI) callback(session mail.Session) (err error) {
+	fbp.BreakSession(session)
 
-		fbp.BreakSession(session)
-		fmt.Print("break")
-
-		item, ok := session.Value(ctxHttpComponentKey{}).(*httpCacheItem)
-		if !ok {
-			err = errors.New("http component handler could not get response object")
-			return
-		}
-
-		if item.done == nil || item.ctx == nil {
-			return
-		}
-
-		payload, ok := session.Payload().(*protocol.Payload)
-		if !ok {
-			err = errors.New("could not convert session payload to *protocol.Payload")
-			return
-		}
-
-		if item.ctx.Err() != nil {
-			return
-		}
-
-		var apiResp PostAPIResponse
-		msgErr := payload.GetMessage().GetError()
-		if msgErr != nil {
-			apiResp.Code = msgErr.GetCode()
-			apiResp.Message = msgErr.GetDescription()
-			apiResp.ErrorNamespace = msgErr.GetNamespace()
-		} else {
-			apiResp.Code = 0
-			apiResp.Result = payload.GetMessage().GetBody()
-		}
-
-		item.c.JSON(http.StatusOK, apiResp)
-
-		item.done <- struct{}{}
-
+	itemV, exist := p.opts.Cache.Get(p.cacheKey(session.PayloadId()))
+	if !exist {
+		err = errors.New("cache is dropped")
 		return
 	}
+	// should add session id to cache
+	item, ok := itemV.(*httpCacheItem)
+	if !ok {
+		err = errors.New("http component handler could not get response object")
+		return
+	}
+
+	if item.done == nil || item.ctx == nil {
+		return
+	}
+
+	payload, ok := session.Payload().(*protocol.Payload)
+	if !ok {
+		err = errors.New("could not convert session payload to *protocol.Payload")
+		return
+	}
+
+	if item.ctx.Err() != nil {
+		return
+	}
+
+	var apiResp PostAPIResponse
+	msgErr := payload.GetMessage().GetErr()
+	if msgErr != nil {
+		apiResp.Code = msgErr.GetCode()
+		apiResp.Message = msgErr.GetDescription()
+		apiResp.ErrorNamespace = msgErr.GetNamespace()
+	} else {
+		apiResp.Code = 0
+		apiResp.Result = payload.GetMessage().GetBody()
+	}
+
+	item.c.JSON(http.StatusOK, apiResp)
+
+	item.done <- struct{}{}
+
+	return
+}
+
+func (p *PostAPI) Route(mail.Session) worker.HandlerFunc {
+	return p.callback
 }
 
 func (p *PostAPI) Start() error {
@@ -264,4 +273,8 @@ func (p *PostAPI) Document() doc.Document {
 	}
 
 	return document
+}
+
+func (p *PostAPI) cacheKey(id string) string {
+	return fmt.Sprintf("POSTAPI:REQ:%s", id)
 }
