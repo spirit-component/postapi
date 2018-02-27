@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/go-spirit/spirit/protocol"
+	"github.com/go-spirit/spirit/worker/fbp/protocol"
 	"github.com/gogap/config"
 )
 

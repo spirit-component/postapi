@@ -16,9 +16,9 @@ import (
 	"github.com/go-spirit/spirit/doc"
 	"github.com/go-spirit/spirit/mail"
 	"github.com/go-spirit/spirit/message"
-	"github.com/go-spirit/spirit/protocol"
 	"github.com/go-spirit/spirit/worker"
 	"github.com/go-spirit/spirit/worker/fbp"
+	"github.com/go-spirit/spirit/worker/fbp/protocol"
 )
 
 type ctxHttpComponentKey struct{}
@@ -209,7 +209,7 @@ func (p *PostAPI) serve(c *gin.Context) {
 func (p *PostAPI) callback(session mail.Session) (err error) {
 	fbp.BreakSession(session)
 
-	itemV, exist := p.opts.Cache.Get(p.cacheKey(session.PayloadId()))
+	itemV, exist := p.opts.Cache.Get(p.cacheKey(session.Payload().ID()))
 	if !exist {
 		err = errors.New("cache is dropped")
 		return
@@ -225,7 +225,7 @@ func (p *PostAPI) callback(session mail.Session) (err error) {
 		return
 	}
 
-	payload, ok := session.Payload().(*protocol.Payload)
+	payload, ok := session.Payload().Interface().(*protocol.Payload)
 	if !ok {
 		err = errors.New("could not convert session payload to *protocol.Payload")
 		return
