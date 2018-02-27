@@ -3,31 +3,22 @@ POST API
 
 ## build post-api
 
-#### create imports file
+> Install spirit-builder command before you build postapi
 
-imports_postapi.go
-
-```go
-package main
-
-import (
-	_ "github.com/go-spirit/spirit/component/mns"
-	_ "github.com/spirit-component/postapi"
-)
-```
-
-#### copy imports file to go-spirit dir
+#### Install spirit-builder command
 
 ```bash
-> cp imports_postapi.go $GOPATH/src/github.com/go-spirit/go-spirit 
+go get github.com/go-spirit/spirit-builder
+go install github.com/go-spirit/spirit-builder
 ```
 
-#### build
+
+#### Build
 
 ```bash
-> cd $GOPATH/src/github.com/go-spirit/go-spirit
-> go build -o postapi ./main.go ./imports_postapi.go
+> spirit-builder build --config build.conf
 ```
+
 
 #### make sure the components are already registered
 
