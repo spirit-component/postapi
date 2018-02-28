@@ -124,6 +124,8 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 			AllowCredentials: httpConf.GetBoolean("cors.allow-credentials", false),
 			MaxAge:           httpConf.GetTimeDuration("cors.max-age", time.Hour*12),
 		}
+
+		corsConf.AllowOriginFunc = wildcardMatchFunc(corsConf.AllowOrigins)
 	}
 
 	corsConf.AllowHeaders = append(corsConf.AllowHeaders, "X-Api", "X-Api-Batch", "X-Api-Timeout")
