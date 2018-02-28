@@ -51,7 +51,7 @@ type PostAPI struct {
 
 	graphs GraphProvider
 
-	router *gin.Engine
+	srv *http.Server
 }
 
 func init() {
@@ -93,7 +93,10 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 	router.Use(gin.Recovery())
 	router.POST(urlPath, p.serve)
 
-	p.router = router
+	p.srv = &http.Server{
+		Addr:    ":8080",
+		Handler: router,
+	}
 
 	return
 }
@@ -435,11 +438,27 @@ func (p *PostAPI) Route(mail.Session) worker.HandlerFunc {
 }
 
 func (p *PostAPI) Start() error {
-	go p.router.Run()
+	go func() {
+		if err := p.srv.ListenAndServe(); err != nil {
+			if err != http.ErrServerClosed {
+				logrus.WithField("component", "PostAPI").WithError(err).Errorln("Listen")
+			}
+		}
+	}()
 	return nil
 }
 
 func (p *PostAPI) Stop() error {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := p.srv.Shutdown(ctx); err != nil {
+		logrus.WithField("component", "PostAPI").WithError(err).Errorln("Server shutdown")
+	}
+
+	logrus.WithField("component", "PostAPI").Infoln("Server exiting")
+
 	return nil
 }
 
