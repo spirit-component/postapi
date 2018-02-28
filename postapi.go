@@ -281,7 +281,7 @@ func (p *PostAPI) serveBatchCall(c *gin.Context) (err error) {
 
 	batchReq := batchApiCallReq{}
 
-	err = c.BindJSON(&batchReq)
+	err = c.ShouldBindJSON(&batchReq)
 	if err != nil {
 		return
 	}
