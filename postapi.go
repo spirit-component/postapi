@@ -106,14 +106,14 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 	var corsConf cors.Config
 
 	if httpConf.GetConfig("cors") == nil {
-		corsConf = cors.Config{
-			AllowOrigins:     []string{"*"},
-			AllowMethods:     []string{"POST"},
-			AllowHeaders:     []string{"Origin", "X-Api", "X-Api-Batch", "X-Api-Timeout"},
-			ExposeHeaders:    []string{"Content-Length"},
-			AllowCredentials: true,
-			MaxAge:           time.Hour * 12,
+
+		corsConf = cors.DefaultConfig()
+		corsConf.AllowMethods = []string{"POST"}
+		corsConf.AllowOrigins = []string{"*"}
+		corsConf.AllowOriginFunc = func(origin string) bool {
+			return true
 		}
+
 		logrus.WithField("component", "PostAPI").Infoln("using default cors config")
 	} else {
 		corsConf = cors.Config{
@@ -125,6 +125,8 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 			MaxAge:           httpConf.GetTimeDuration("cors.max-age", time.Hour*12),
 		}
 	}
+
+	corsConf.AllowHeaders = append(corsConf.AllowHeaders, "X-Api", "X-Api-Batch", "X-Api-Timeout")
 
 	router.Use(cors.New(corsConf))
 
