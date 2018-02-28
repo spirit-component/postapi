@@ -155,6 +155,11 @@ func (p *defaultGraphProvider) configToPorts(apiName string, conf config.Configu
 
 	for _, name := range portNames {
 
+		skip := conf.GetBoolean(name+".skip", false)
+		if skip {
+			continue
+		}
+
 		seq := conf.GetInt32(name + ".seq")
 		if seq < 0 {
 			err = fmt.Errorf("seq should greater than 0, api: %s, port %s", apiName, name)
