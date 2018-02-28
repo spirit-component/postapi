@@ -21,6 +21,12 @@ import (
 	"github.com/go-spirit/spirit/worker/fbp/protocol"
 )
 
+const (
+	XApi        = "X-Api"
+	XApiBatch   = "X-Api-Batch"
+	XApiTimeout = "X-Api-Timeout"
+)
+
 type ctxHttpComponentKey struct{}
 
 type httpCacheItem struct {
@@ -100,7 +106,7 @@ func (p *PostAPI) serve(c *gin.Context) {
 		return
 	}
 
-	apiName := c.GetHeader("X-Api")
+	apiName := c.GetHeader(XApi)
 
 	graphs, exist := p.graphs.Query(apiName)
 
@@ -151,21 +157,29 @@ func (p *PostAPI) serve(c *gin.Context) {
 	var cancel context.CancelFunc
 	var doneChan chan struct{}
 
-	// if wait {
+	strTimeout := c.GetHeader(XApiTimeout)
 
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
+	timeout := time.Second * 30
 
-	doneChan = make(chan struct{})
-	defer close(doneChan)
+	if len(strTimeout) > 0 {
+		dur, e := time.ParseDuration(strTimeout)
+		if e == nil {
+			timeout = dur
+		}
+	}
 
-	// session.WithValue(ctxHttpComponentKey{}, &httpCacheItem{c, ctx, doneChan})
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+		defer cancel()
 
-	p.opts.Cache.Set(p.cacheKey(id), &httpCacheItem{c, ctx, doneChan})
+		doneChan = make(chan struct{})
+		defer close(doneChan)
 
-	// } else {
-	// 	session.WithValue(ctxHttpComponentKey{}, &httpCacheItem{c, nil, nil})
-	// }
+		// storage response object to cache
+		p.opts.Cache.Set(p.cacheKey(id), &httpCacheItem{c, ctx, doneChan})
+	} else {
+		p.opts.Cache.Set(p.cacheKey(id), (*httpCacheItem)(nil))
+	}
 
 	err = p.opts.Postman.Post(
 		message.NewUserMessage(session),
@@ -181,10 +195,10 @@ func (p *PostAPI) serve(c *gin.Context) {
 		return
 	}
 
-	// if !wait {
-	// 	c.JSON(http.StatusOK, struct{}{})
-	// 	return
-	// }
+	if timeout <= 0 {
+		c.JSON(http.StatusOK, PostAPIResponse{})
+		return
+	}
 
 	for {
 		select {
@@ -209,15 +223,22 @@ func (p *PostAPI) serve(c *gin.Context) {
 func (p *PostAPI) callback(session mail.Session) (err error) {
 	fbp.BreakSession(session)
 
-	itemV, exist := p.opts.Cache.Get(p.cacheKey(session.Payload().ID()))
+	cacheKey := p.cacheKey(session.Payload().ID())
+	itemV, exist := p.opts.Cache.Get(cacheKey)
 	if !exist {
-		err = errors.New("cache is dropped")
+		err = fmt.Errorf("cache is dropped, key: %s", cacheKey)
 		return
 	}
+
+	defer p.opts.Cache.Delete(cacheKey)
 	// should add session id to cache
 	item, ok := itemV.(*httpCacheItem)
 	if !ok {
 		err = errors.New("http component handler could not get response object")
+		return
+	}
+
+	if item == nil {
 		return
 	}
 
