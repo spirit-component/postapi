@@ -462,11 +462,13 @@ func (p *PostAPI) Start() error {
 
 func (p *PostAPI) Stop() error {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	dur := p.opts.Config.GetTimeDuration("http.shutdown-timeout", time.Second*30)
+
+	ctx, cancel := context.WithTimeout(context.Background(), dur)
 	defer cancel()
 
 	if err := p.srv.Shutdown(ctx); err != nil {
-		logrus.WithField("component", "PostAPI").WithError(err).Errorln("Server shutdown")
+		return fmt.Errorf("postapi shutdown failure, err: %s", err)
 	}
 
 	logrus.WithField("component", "PostAPI").Infoln("Server exiting")
