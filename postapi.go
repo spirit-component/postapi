@@ -450,11 +450,24 @@ func (p *PostAPI) Route(mail.Session) worker.HandlerFunc {
 }
 
 func (p *PostAPI) Start() error {
+
 	go func() {
-		if err := p.srv.ListenAndServe(); err != nil {
-			if err != http.ErrServerClosed {
-				logrus.WithField("component", "PostAPI").WithError(err).Errorln("Listen")
-			}
+
+		var err error
+
+		sslConf := p.opts.Config.GetConfig("http.ssl")
+
+		if sslConf != nil && sslConf.GetBoolean("enabled", false) {
+			err = p.srv.ListenAndServeTLS(
+				sslConf.GetString("cert-file"),
+				sslConf.GetString("cert-key"),
+			)
+		} else {
+			err = p.srv.ListenAndServe()
+		}
+
+		if err != http.ErrServerClosed {
+			logrus.WithField("component", "PostAPI").WithError(err).Errorln("Listen")
 		}
 	}()
 	return nil
