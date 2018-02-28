@@ -5,14 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-contrib/cors"
-	"github.com/gogap/config"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gogap/config"
 	"github.com/pborman/uuid"
 	"github.com/sirupsen/logrus"
 
@@ -101,36 +100,10 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 		httpConf = config.NewConfig()
 	}
 
+	loadCORS(router, httpConf.GetConfig("cors"))
+	loadPprof(router, httpConf.GetConfig("pprof"))
+
 	address := httpConf.GetString("address", ":8080")
-
-	var corsConf cors.Config
-
-	if httpConf.GetConfig("cors") == nil {
-
-		corsConf = cors.DefaultConfig()
-		corsConf.AllowMethods = []string{"POST"}
-		corsConf.AllowOrigins = []string{"*"}
-		corsConf.AllowOriginFunc = func(origin string) bool {
-			return true
-		}
-
-		logrus.WithField("component", "PostAPI").Infoln("using default cors config")
-	} else {
-		corsConf = cors.Config{
-			AllowOrigins:     httpConf.GetStringList("cors.allow-origins"),
-			AllowMethods:     httpConf.GetStringList("cors.allow-methods"),
-			AllowHeaders:     httpConf.GetStringList("cors.allow-headers"),
-			ExposeHeaders:    httpConf.GetStringList("cors.expose-headers"),
-			AllowCredentials: httpConf.GetBoolean("cors.allow-credentials", false),
-			MaxAge:           httpConf.GetTimeDuration("cors.max-age", time.Hour*12),
-		}
-
-		corsConf.AllowOriginFunc = wildcardMatchFunc(corsConf.AllowOrigins)
-	}
-
-	corsConf.AllowHeaders = append(corsConf.AllowHeaders, "X-Api", "X-Api-Batch", "X-Api-Timeout")
-
-	router.Use(cors.New(corsConf))
 
 	p.srv = &http.Server{
 		Addr:    address,
