@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -32,10 +34,11 @@ type ctxHttpComponentKey struct{}
 type httpCacheItem struct {
 	c    *gin.Context
 	ctx  context.Context
-	done chan struct{}
+	done chan *PostAPIResponse
 }
 
 type PostAPIResponse struct {
+	API            string          `json:"-"`
 	Code           int64           `json:"code"`
 	ErrorId        string          `json:"error_id,omitempty"`
 	ErrorNamespace string          `json:"error_namespace,omitempty"`
@@ -95,29 +98,17 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 	return
 }
 
-func (p *PostAPI) serve(c *gin.Context) {
-
-	var err error
-
-	var body []byte
-	body, err = c.GetRawData()
-
-	if err != nil {
-		return
-	}
-
-	apiName := c.GetHeader(XApi)
+func (p *PostAPI) call(apiName string, body []byte, timeout time.Duration, c *gin.Context) (resp *PostAPIResponse) {
 
 	graphs, exist := p.graphs.Query(apiName)
 
 	if !exist {
-		c.JSON(http.StatusNotFound,
-			PostAPIResponse{
-				ErrorNamespace: "POST-API",
-				Code:           http.StatusNotFound,
-				Message:        "Api Not Found",
-			},
-		)
+		resp = &PostAPIResponse{
+			API:            apiName,
+			ErrorNamespace: "POST-API",
+			Code:           http.StatusNotFound,
+			Message:        "Api Not Found",
+		}
 		return
 	}
 
@@ -136,13 +127,24 @@ func (p *PostAPI) serve(c *gin.Context) {
 
 	graph, exist := payload.GetGraph(fbp.GraphNameOfNormal)
 	if !exist {
-		err = fmt.Errorf("api graph of %s, did not exist normal graph", apiName)
+		resp = &PostAPIResponse{
+			API:            apiName,
+			ErrorNamespace: "POST-API",
+			Code:           http.StatusInternalServerError,
+			Message:        "Internal Error (Api graph not found)",
+		}
 		return
 	}
 
 	port, err := graph.CurrentPort()
 
 	if err != nil {
+		resp = &PostAPIResponse{
+			API:            apiName,
+			ErrorNamespace: "POST-API",
+			Code:           http.StatusInternalServerError,
+			Message:        "Internal Error (bad graph)",
+		}
 		return
 	}
 
@@ -155,24 +157,13 @@ func (p *PostAPI) serve(c *gin.Context) {
 
 	var ctx context.Context
 	var cancel context.CancelFunc
-	var doneChan chan struct{}
-
-	strTimeout := c.GetHeader(XApiTimeout)
-
-	timeout := time.Second * 30
-
-	if len(strTimeout) > 0 {
-		dur, e := time.ParseDuration(strTimeout)
-		if e == nil {
-			timeout = dur
-		}
-	}
+	var doneChan chan *PostAPIResponse
 
 	if timeout > 0 {
 		ctx, cancel = context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 
-		doneChan = make(chan struct{})
+		doneChan = make(chan *PostAPIResponse)
 		defer close(doneChan)
 
 		// storage response object to cache
@@ -192,32 +183,203 @@ func (p *PostAPI) serve(c *gin.Context) {
 			WithField("to", session.To()).
 			WithField("seq", graph.GetSeq()).
 			WithError(err).Errorln("post user message failure")
+
+		resp = &PostAPIResponse{
+			API:            apiName,
+			ErrorNamespace: "POST-API",
+			Code:           http.StatusInternalServerError,
+			Message:        "Internal Error - post failure",
+		}
+
 		return
 	}
 
 	if timeout <= 0 {
-		c.JSON(http.StatusOK, PostAPIResponse{})
+		resp = &PostAPIResponse{}
+		resp.API = apiName
 		return
 	}
 
 	for {
 		select {
-		case <-doneChan:
+		case r := <-doneChan:
 			{
+				resp = r
+				resp.API = apiName
 				return
 			}
 		case <-ctx.Done():
 			{
-				c.JSON(http.StatusRequestTimeout, PostAPIResponse{
+				resp = &PostAPIResponse{
+					API:            apiName,
 					ErrorNamespace: "POST-API",
 					Code:           http.StatusRequestTimeout,
 					Message:        "Request Timeout",
-				})
+				}
+
 				return
 			}
 		}
 	}
+}
 
+type batchApiCallReq map[string]json.RawMessage
+
+func (p *PostAPI) serve(c *gin.Context) {
+
+	var err error
+
+	strIsBatchCall := c.GetHeader(XApiBatch)
+
+	isBatchCall := false
+
+	if len(strIsBatchCall) > 0 {
+
+		isBatchCall, err = strconv.ParseBool(strIsBatchCall)
+
+		if err != nil {
+			c.JSON(
+				http.StatusOK,
+				PostAPIResponse{
+					ErrorNamespace: "POST-API",
+					Code:           http.StatusBadRequest,
+					Message:        "Bad request - batch call header error",
+				},
+			)
+
+			return
+		}
+
+	}
+
+	if isBatchCall {
+		err = p.serveBatchCall(c)
+	} else {
+		err = p.serveSingleCall(c)
+	}
+
+	if err != nil {
+		c.JSON(
+			http.StatusOK,
+			PostAPIResponse{
+				ErrorNamespace: "POST-API",
+				Code:           http.StatusBadRequest,
+				Message:        "Bad request",
+			},
+		)
+
+		logrus.WithField("component", "post-api").
+			WithField("is-batch", isBatchCall).
+			WithField("X-Api", c.GetHeader(XApi)).
+			WithError(err).Errorln("serve request failure")
+
+		return
+	}
+}
+
+func (p *PostAPI) serveBatchCall(c *gin.Context) (err error) {
+
+	batchReq := batchApiCallReq{}
+
+	err = c.BindJSON(&batchReq)
+	if err != nil {
+		return
+	}
+
+	preperReqs := make(map[string][]byte)
+
+	for apiName, jsonData := range batchReq {
+		_, exist := p.graphs.Query(apiName)
+		if !exist {
+			c.JSON(
+				http.StatusOK,
+				&PostAPIResponse{
+					ErrorNamespace: "POST-API",
+					Code:           http.StatusNotFound,
+					Message:        fmt.Sprintf("Api Not Found: %s", apiName),
+				},
+			)
+			return
+		}
+
+		preperReqs[apiName] = jsonData
+	}
+
+	if len(preperReqs) == 0 {
+		c.JSON(http.StatusOK, PostAPIResponse{})
+		return
+	}
+
+	strTimeout := c.GetHeader(XApiTimeout)
+	timeout := time.Second * 30
+
+	if len(strTimeout) > 0 {
+		if dur, e := time.ParseDuration(strTimeout); e == nil {
+			timeout = dur
+		}
+	}
+
+	wg := &sync.WaitGroup{}
+
+	respChan := make(chan *PostAPIResponse, len(preperReqs))
+
+	wg.Add(len(preperReqs))
+	for apiName, data := range preperReqs {
+		go func(apiName string, data []byte, timeout time.Duration, c *gin.Context, respC chan<- *PostAPIResponse) {
+
+			defer wg.Done()
+			resp := p.call(apiName, data, timeout, c)
+			respC <- resp
+
+		}(apiName, data, timeout, c, respChan)
+	}
+
+	wg.Wait()
+	close(respChan)
+
+	resps := map[string]*PostAPIResponse{}
+	for resp := range respChan {
+		resps[resp.API] = resp
+	}
+
+	rawResp, err := json.Marshal(resps)
+	if err != nil {
+		return
+	}
+
+	c.JSON(http.StatusOK,
+		PostAPIResponse{
+			Result: rawResp,
+		},
+	)
+
+	return
+}
+
+func (p *PostAPI) serveSingleCall(c *gin.Context) (err error) {
+
+	var body []byte
+	body, err = c.GetRawData()
+
+	if err != nil {
+		return
+	}
+
+	apiName := c.GetHeader(XApi)
+	strTimeout := c.GetHeader(XApiTimeout)
+	timeout := time.Second * 30
+
+	if len(strTimeout) > 0 {
+		if dur, e := time.ParseDuration(strTimeout); e == nil {
+			timeout = dur
+		}
+	}
+
+	resp := p.call(apiName, body, timeout, c)
+
+	c.JSON(http.StatusOK, resp)
+
+	return
 }
 
 func (p *PostAPI) callback(session mail.Session) (err error) {
@@ -238,11 +400,7 @@ func (p *PostAPI) callback(session mail.Session) (err error) {
 		return
 	}
 
-	if item == nil {
-		return
-	}
-
-	if item.done == nil || item.ctx == nil {
+	if item == nil || item.done == nil || item.ctx == nil {
 		return
 	}
 
@@ -256,7 +414,7 @@ func (p *PostAPI) callback(session mail.Session) (err error) {
 		return
 	}
 
-	var apiResp PostAPIResponse
+	apiResp := &PostAPIResponse{}
 	msgErr := payload.GetMessage().GetErr()
 	if msgErr != nil {
 		apiResp.Code = msgErr.GetCode()
@@ -267,9 +425,7 @@ func (p *PostAPI) callback(session mail.Session) (err error) {
 		apiResp.Result = payload.GetMessage().GetBody()
 	}
 
-	item.c.JSON(http.StatusOK, apiResp)
-
-	item.done <- struct{}{}
+	item.done <- apiResp
 
 	return
 }
