@@ -48,7 +48,8 @@ type PostAPIResponse struct {
 }
 
 type PostAPI struct {
-	opts component.Options
+	opts  component.Options
+	alias string
 
 	graphs GraphProvider
 
@@ -60,8 +61,10 @@ func init() {
 	doc.RegisterDocumenter("post-api", &PostAPI{})
 }
 
-func NewPostAPI(opts ...component.Option) (srv component.Component, err error) {
-	s := &PostAPI{}
+func NewPostAPI(alias string, opts ...component.Option) (srv component.Component, err error) {
+	s := &PostAPI{
+		alias: alias,
+	}
 
 	s.init(opts...)
 
@@ -100,8 +103,8 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 		httpConf = config.NewConfig()
 	}
 
-	loadCORS(router, httpConf.GetConfig("cors"))
-	loadPprof(router, httpConf.GetConfig("pprof"))
+	p.loadCORS(router, httpConf.GetConfig("cors"))
+	p.loadPprof(router, httpConf.GetConfig("pprof"))
 
 	address := httpConf.GetString("address", ":8080")
 
@@ -194,6 +197,7 @@ func (p *PostAPI) call(apiName string, body []byte, timeout time.Duration, c *gi
 	if err != nil {
 
 		logrus.WithField("component", "post-api").
+			WithField("alias", p.alias).
 			WithField("from", session.From()).
 			WithField("to", session.To()).
 			WithField("seq", graph.GetSeq()).
@@ -284,6 +288,7 @@ func (p *PostAPI) serve(c *gin.Context) {
 		)
 
 		logrus.WithField("component", "post-api").
+			WithField("alias", p.alias).
 			WithField("is-batch", isBatchCall).
 			WithField("X-Api", c.GetHeader(XApi)).
 			WithError(err).Errorln("serve request failure")
@@ -467,7 +472,7 @@ func (p *PostAPI) Start() error {
 		}
 
 		if err != http.ErrServerClosed {
-			logrus.WithField("component", "PostAPI").WithError(err).Errorln("Listen")
+			logrus.WithField("component", "post-api").WithField("alias", p.alias).WithError(err).Errorln("Listen")
 		}
 	}()
 	return nil
@@ -484,9 +489,16 @@ func (p *PostAPI) Stop() error {
 		return fmt.Errorf("postapi shutdown failure, err: %s", err)
 	}
 
-	logrus.WithField("component", "PostAPI").Infoln("Server exiting")
+	logrus.WithField("component", "post-api").WithField("alias", p.alias).Infoln("Server exiting")
 
 	return nil
+}
+
+func (p *PostAPI) Alias() string {
+	if p == nil {
+		return ""
+	}
+	return p.alias
 }
 
 func (p *PostAPI) Document() doc.Document {
