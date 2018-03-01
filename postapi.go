@@ -22,6 +22,7 @@ import (
 	"github.com/go-spirit/spirit/worker"
 	"github.com/go-spirit/spirit/worker/fbp"
 	"github.com/go-spirit/spirit/worker/fbp/protocol"
+	"github.com/spirit-component/postapi/grapher"
 )
 
 const (
@@ -51,7 +52,7 @@ type PostAPI struct {
 	opts  component.Options
 	alias string
 
-	graphs GraphProvider
+	grapher grapher.Grapher
 
 	srv *http.Server
 }
@@ -78,13 +79,21 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 		o(&p.opts)
 	}
 
-	p.graphs, err = newDefaultGraphProvider(
-		p.opts.Config.GetConfig("api"),
-	)
+	grapherDriver := p.opts.Config.GetString("grapher.driver", "default")
 
+	if len(grapherDriver) == 0 {
+		err = errors.New("post api grapher driver is empty")
+		return
+	}
+
+	grapherConf := p.opts.Config.GetConfig(fmt.Sprintf("grapher.%s", grapherDriver))
+
+	apiGrapher, err := grapher.NewGrapher(grapherDriver, grapherConf)
 	if err != nil {
 		return
 	}
+
+	p.grapher = apiGrapher
 
 	debug := p.opts.Config.GetBoolean("debug", false)
 	if !debug {
@@ -118,7 +127,7 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 
 func (p *PostAPI) call(apiName string, body []byte, timeout time.Duration, c *gin.Context) (resp *PostAPIResponse) {
 
-	graphs, exist := p.graphs.Query(apiName)
+	graphs, exist := p.grapher.Query(apiName)
 
 	if !exist {
 		resp = &PostAPIResponse{
@@ -309,7 +318,7 @@ func (p *PostAPI) serveBatchCall(c *gin.Context) (err error) {
 	preperReqs := make(map[string][]byte)
 
 	for apiName, jsonData := range batchReq {
-		_, exist := p.graphs.Query(apiName)
+		_, exist := p.grapher.Query(apiName)
 		if !exist {
 			c.JSON(
 				http.StatusOK,
