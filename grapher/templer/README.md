@@ -22,13 +22,13 @@ components.post-api.external.grapher.templer = {
 
 ```
 {
-    "errors": {
+    "error": {
         "ports": [{
             "seq": 1,
             "url": "spirit://actors/fbp/post-api/external?action=callback"
         }]
     },
-    "normal": {
+    "entrypoint": {
         "ports": [{
             "seq": 1,
             "url": "spirit://actors/fbp/goja/api-mock?action={{.api}}"

@@ -12,7 +12,7 @@ import (
 )
 
 type defaultGrapher struct {
-	graphs map[string]*postAPIPorts
+	graphs map[string]map[string][]*protocol.Port
 
 	locker sync.Mutex
 }
@@ -23,7 +23,7 @@ func init() {
 
 func newDefaultGrapher(conf config.Configuration) (grapher Grapher, err error) {
 	provider := &defaultGrapher{
-		graphs: make(map[string]*postAPIPorts),
+		graphs: make(map[string]map[string][]*protocol.Port),
 	}
 
 	err = provider.loadGraph(conf, false)
@@ -46,17 +46,25 @@ func (p *defaultGrapher) Query(apiName string, header http.Header) (map[string]*
 
 	graphs := make(map[string]*protocol.Graph)
 
-	graphs[fbp.GraphNameOfNormal] = &protocol.Graph{
-		Seq:   1,
-		Name:  fbp.GraphNameOfNormal,
-		Ports: g.Normal,
+	for k, v := range g {
+		graphs[k] = &protocol.Graph{
+			Seq:   1,
+			Name:  k,
+			Ports: v,
+		}
 	}
 
-	graphs[fbp.GraphNameOfError] = &protocol.Graph{
-		Seq:   1,
-		Name:  fbp.GraphNameOfError,
-		Ports: g.Error,
-	}
+	// graphs[fbp.GraphNameOfNormal] = &protocol.Graph{
+	// 	Seq:   1,
+	// 	Name:  fbp.GraphNameOfNormal,
+	// 	Ports: g.Normal,
+	// }
+
+	// graphs[fbp.GraphNameOfError] = &protocol.Graph{
+	// 	Seq:   1,
+	// 	Name:  fbp.GraphNameOfError,
+	// 	Ports: g.Error,
+	// }
 
 	return graphs, true
 }
@@ -80,7 +88,7 @@ func (p *defaultGrapher) loadGraph(conf config.Configuration, fallback bool) (er
 	p.locker.Lock()
 	defer p.locker.Unlock()
 
-	var graphs = make(map[string]*postAPIPorts)
+	var graphs = make(map[string]map[string][]*protocol.Port)
 
 	for _, apiKey := range apiNames {
 		apiName := strings.Replace(apiKey, "-", ".", -1)
@@ -101,36 +109,31 @@ func (p *defaultGrapher) loadGraph(conf config.Configuration, fallback bool) (er
 			return
 		}
 
-		errPortsConfig := graphConf.GetConfig("errors")
+		var apiGraphs = make(map[string][]*protocol.Port)
 
-		var errorPorts []*protocol.Port
-		errorPorts, err = p.configToPorts(apiKey, errPortsConfig)
+		for _, graphName := range graphConf.Keys() {
+			portsConfig := graphConf.GetConfig(graphName)
 
-		if err != nil {
+			var ports []*protocol.Port
+			ports, err = p.configToPorts(apiKey, portsConfig)
+
+			if err != nil {
+				return
+			}
+
+			for _, port := range ports {
+				port.GraphName = graphName
+			}
+
+			apiGraphs[graphName] = ports
+		}
+
+		if _, exist := apiGraphs[fbp.GraphNameOfEntrypoint]; !exist {
+			err = fmt.Errorf("api of '%s' has no entrypoint", apiKey)
 			return
 		}
 
-		portsConfig := graphConf.GetConfig("normal")
-
-		var normalPorts []*protocol.Port
-		normalPorts, err = p.configToPorts(apiKey, portsConfig)
-
-		if err != nil {
-			return
-		}
-
-		for _, port := range errorPorts {
-			port.GraphName = fbp.GraphNameOfError
-		}
-
-		for _, port := range normalPorts {
-			port.GraphName = fbp.GraphNameOfNormal
-		}
-
-		graphs[apiName] = &postAPIPorts{
-			Error:  errorPorts,
-			Normal: normalPorts,
-		}
+		graphs[apiName] = apiGraphs
 	}
 
 	p.graphs = graphs

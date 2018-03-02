@@ -12,14 +12,14 @@ todo-task-add {
 	name  = "todo.task.add"
 	graph = {
 		
-		errors {
+		error {
 			to-queue {
 				url      = "spirit://actors/mns/sender?queue=post-api-error"
 				metadata = {}
 			}
 		}
 
-		ports {
+		entrypoint {
 			to-queue {
 				url      = "spirit://actors/mns/sender?queue=todo-task-add"
 				metadata = {}

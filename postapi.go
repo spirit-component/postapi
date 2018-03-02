@@ -67,7 +67,10 @@ func NewPostAPI(alias string, opts ...component.Option) (srv component.Component
 		alias: alias,
 	}
 
-	s.init(opts...)
+	err = s.init(opts...)
+	if err != nil {
+		return
+	}
 
 	srv = s
 	return
@@ -89,6 +92,7 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 	grapherConf := p.opts.Config.GetConfig(fmt.Sprintf("grapher.%s", grapherDriver))
 
 	apiGrapher, err := grapher.NewGrapher(grapherDriver, grapherConf)
+
 	if err != nil {
 		return
 	}
@@ -143,7 +147,7 @@ func (p *PostAPI) call(apiName string, body []byte, timeout time.Duration, c *gi
 	payload := &protocol.Payload{
 		Id:           id,
 		Timestamp:    time.Now().UnixNano(),
-		CurrentGraph: fbp.GraphNameOfNormal,
+		CurrentGraph: fbp.GraphNameOfEntrypoint,
 		Graphs:       graphs,
 		Message: &protocol.Message{
 			Id:     id,
@@ -152,7 +156,7 @@ func (p *PostAPI) call(apiName string, body []byte, timeout time.Duration, c *gi
 		},
 	}
 
-	graph, exist := payload.GetGraph(fbp.GraphNameOfNormal)
+	graph, exist := payload.GetGraph(fbp.GraphNameOfEntrypoint)
 	if !exist {
 		resp = &PostAPIResponse{
 			API:            apiName,

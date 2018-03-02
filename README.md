@@ -61,7 +61,7 @@ components.post-api.external.grapher.default = {
 	todo-task-new {
 		name  = "todo.task.new"
 		graph = {
-			errors {
+			error {
 				to-queue {
 					seq = 1
 					url = "spirit://actors/fbp/mns/endpoint?queue=api-call-error"
@@ -73,7 +73,7 @@ components.post-api.external.grapher.default = {
 				}
 			}
 
-			normal {
+			entrypoint {
 				to-queue-new-task {
 					seq = 1
 					url = "spirit://actors/fbp/mns/endpoint?queue=todo-task-new"
