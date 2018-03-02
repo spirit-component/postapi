@@ -79,7 +79,7 @@ func (p *TemplerGrapher) Query(apiName string, header http.Header) (map[string]*
 	}
 
 	buf := bytes.NewBuffer(nil)
-	err := tmpl.Execute(buf, map[string]interface{}{"api": apiName})
+	err := tmpl.Execute(buf, map[string]interface{}{"api": apiName, "header": header})
 	if err != nil {
 		logrus.WithField("components", "postapi").WithField("grapher", "templer").WithError(err).Errorln("query api graph")
 		return nil, false
