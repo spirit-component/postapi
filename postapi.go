@@ -127,7 +127,7 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 
 func (p *PostAPI) call(apiName string, body []byte, timeout time.Duration, c *gin.Context) (resp *PostAPIResponse) {
 
-	graphs, exist := p.grapher.Query(apiName)
+	graphs, exist := p.grapher.Query(apiName, c.Request.Header)
 
 	if !exist {
 		resp = &PostAPIResponse{
@@ -318,7 +318,7 @@ func (p *PostAPI) serveBatchCall(c *gin.Context) (err error) {
 	preperReqs := make(map[string][]byte)
 
 	for apiName, jsonData := range batchReq {
-		_, exist := p.grapher.Query(apiName)
+		_, exist := p.grapher.Query(apiName, c.Request.Header)
 		if !exist {
 			c.JSON(
 				http.StatusOK,

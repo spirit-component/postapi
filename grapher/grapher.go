@@ -3,6 +3,7 @@ package grapher
 import (
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/go-spirit/spirit/worker/fbp/protocol"
 	"github.com/gogap/config"
@@ -15,7 +16,7 @@ type postAPIPorts struct {
 
 type Grapher interface {
 	WithFallback(config.Configuration) error
-	Query(apiName string) (map[string]*protocol.Graph, bool)
+	Query(apiName string, header http.Header) (map[string]*protocol.Graph, bool)
 }
 
 type NewGrapherFunc func(config.Configuration) (Grapher, error)

@@ -2,6 +2,7 @@ package grapher
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -36,7 +37,7 @@ func newDefaultGrapher(conf config.Configuration) (grapher Grapher, err error) {
 	return
 }
 
-func (p *defaultGrapher) Query(apiName string) (map[string]*protocol.Graph, bool) {
+func (p *defaultGrapher) Query(apiName string, header http.Header) (map[string]*protocol.Graph, bool) {
 	g, exist := p.graphs[apiName]
 
 	if !exist {

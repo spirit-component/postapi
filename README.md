@@ -54,7 +54,9 @@ components.mns.endpoint {
 	}
 }
 
-components.post-api.external.api = {
+components.post-api.external.grapher.driver = default
+
+components.post-api.external.grapher.default = {
 
 	todo-task-new {
 		name  = "todo.task.new"
@@ -80,45 +82,6 @@ components.post-api.external.api = {
 				to-todo {
 					seq = 2
 					url = "spirit://actors/fbp/examples-todo/todo?action=new"
-				}
-
-				to-callback-queue {
-					seq = 3
-					url = "spirit://actors/fbp/mns/endpoint?queue=api-call-back"
-				}
-
-				response {
-					seq = 4
-					url = "spirit://actors/fbp/post-api/external?action=callback"
-				}
-			}
-		}
-	}
-
-	todo-task-get {
-		name  = "todo.task.get"
-		graph = {
-			errors {
-				to-queue {
-					seq = 1
-					url = "spirit://actors/fbp/mns/endpoint?queue=api-call-error"
-				}
-
-				response {
-					seq = 2
-					url = "spirit://actors/fbp/post-api/external?action=callback"
-				}
-			}
-
-			normal {
-				to-queue-get-task {
-					seq = 1
-					url = "spirit://actors/fbp/mns/endpoint?queue=todo-task-get"
-				}
-
-				to-todo {
-					seq = 2
-					url = "spirit://actors/fbp/examples-todo/todo?action=get"
 				}
 
 				to-callback-queue {
