@@ -184,7 +184,7 @@ func (p *PostAPI) call(apiName string, body []byte, timeout time.Duration, c *gi
 	session.WithPayload(payload)
 	session.WithFromTo("", port.GetUrl())
 
-	fbp.SessionWithPort(session, port.GetUrl(), false, port.GetMetadata())
+	fbp.SessionWithPort(session, graph.GetName(), port.GetUrl(), port.GetMetadata())
 
 	var ctx context.Context
 	var cancel context.CancelFunc
