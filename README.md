@@ -3,20 +3,20 @@ POST API
 
 ## build post-api
 
-> Install spirit-builder command before you build postapi
+> Install go-spirit command before you build postapi
 
-#### Install spirit-builder command
+#### Install go-spirit command
 
 ```bash
-go get github.com/go-spirit/spirit-builder
-go install github.com/go-spirit/spirit-builder
+go get github.com/go-spirit/go-spirit
+go install github.com/go-spirit/go-spirit
 ```
 
 
 #### Build
 
 ```bash
-> spirit-builder build --config build.conf
+> go-spirit build --config build.conf
 ```
 
 
