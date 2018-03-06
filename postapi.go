@@ -15,6 +15,7 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/sirupsen/logrus"
 
+	"github.com/go-spirit/spirit/cache"
 	"github.com/go-spirit/spirit/component"
 	"github.com/go-spirit/spirit/doc"
 	"github.com/go-spirit/spirit/mail"
@@ -53,6 +54,7 @@ type PostAPI struct {
 	alias string
 
 	grapher grapher.Grapher
+	cache   cache.Cache
 
 	srv *http.Server
 }
@@ -81,6 +83,19 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 	for _, o := range opts {
 		o(&p.opts)
 	}
+
+	cache, exist := p.opts.Caches.Require("api")
+	if !exist {
+		err = fmt.Errorf("the cache of 'api' not exist")
+		return
+	}
+
+	if !cache.CanStoreInterface() {
+		err = fmt.Errorf("the cache named api's driver must be storage interface{} type")
+		return
+	}
+
+	p.cache = cache
 
 	grapherDriver := p.opts.Config.GetString("grapher.driver", "default")
 
@@ -198,9 +213,9 @@ func (p *PostAPI) call(apiName string, body []byte, timeout time.Duration, c *gi
 		defer close(doneChan)
 
 		// storage response object to cache
-		p.opts.Cache.Set(p.cacheKey(id), &httpCacheItem{c, ctx, doneChan})
+		p.cache.Set(p.cacheKey(id), &httpCacheItem{c, ctx, doneChan})
 	} else {
-		p.opts.Cache.Set(p.cacheKey(id), (*httpCacheItem)(nil))
+		p.cache.Set(p.cacheKey(id), (*httpCacheItem)(nil))
 	}
 
 	err = p.opts.Postman.Post(
@@ -419,13 +434,13 @@ func (p *PostAPI) callback(session mail.Session) (err error) {
 	fbp.BreakSession(session)
 
 	cacheKey := p.cacheKey(session.Payload().ID())
-	itemV, exist := p.opts.Cache.Get(cacheKey)
+	itemV, exist := p.cache.Get(cacheKey)
 	if !exist {
 		err = fmt.Errorf("cache is dropped, key: %s", cacheKey)
 		return
 	}
 
-	defer p.opts.Cache.Delete(cacheKey)
+	defer p.cache.Delete(cacheKey)
 	// should add session id to cache
 	item, ok := itemV.(*httpCacheItem)
 	if !ok {
