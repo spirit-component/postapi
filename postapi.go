@@ -56,6 +56,8 @@ type PostAPI struct {
 	grapher grapher.Grapher
 	cache   cache.Cache
 
+	forwardHeaders []string
+
 	srv *http.Server
 }
 
@@ -136,6 +138,10 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 
 	address := httpConf.GetString("address", ":8080")
 
+	forwardHeaders := httpConf.GetStringList("forward.headers")
+
+	p.forwardHeaders = forwardHeaders
+
 	p.srv = &http.Server{
 		Addr:    address,
 		Handler: router,
@@ -158,6 +164,18 @@ func (p *PostAPI) call(apiName string, body []byte, timeout time.Duration, c *gi
 		return
 	}
 
+	header := map[string]string{}
+
+	for _, name := range header {
+		v := c.GetHeader(name)
+
+		if len(v) > 0 {
+			header[name] = v
+		}
+	}
+
+	header["content-type"] = "application/json"
+
 	id := uuid.New()
 	payload := &protocol.Payload{
 		Id:           id,
@@ -166,7 +184,7 @@ func (p *PostAPI) call(apiName string, body []byte, timeout time.Duration, c *gi
 		Graphs:       graphs,
 		Message: &protocol.Message{
 			Id:     id,
-			Header: map[string]string{"content-type": "application/json"},
+			Header: header,
 			Body:   body,
 		},
 	}
