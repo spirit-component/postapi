@@ -45,8 +45,8 @@ type PostAPIResponse struct {
 	Code           int64           `json:"code"`
 	ErrorId        string          `json:"error_id,omitempty"`
 	ErrorNamespace string          `json:"error_namespace,omitempty"`
-	Message        string          `json:"message,omitempty"`
-	Result         json.RawMessage `json:"result,omitempty"`
+	Message        string          `json:"message"`
+	Result         json.RawMessage `json:"result"`
 }
 
 type PostAPI struct {
