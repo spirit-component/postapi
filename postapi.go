@@ -140,6 +140,8 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 
 	forwardHeaders := httpConf.GetStringList("forward.headers")
 
+	fmt.Println(forwardHeaders)
+
 	p.forwardHeaders = forwardHeaders
 
 	p.srv = &http.Server{
@@ -166,11 +168,13 @@ func (p *PostAPI) call(apiName string, body []byte, timeout time.Duration, c *gi
 
 	header := map[string]string{}
 
-	for _, name := range header {
+	for _, name := range p.forwardHeaders {
 		v := c.GetHeader(name)
 
 		if len(v) > 0 {
 			header[name] = v
+		} else if name == XApi {
+			header[name] = apiName
 		}
 	}
 
