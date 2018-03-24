@@ -140,8 +140,6 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 
 	forwardHeaders := httpConf.GetStringList("forward.headers")
 
-	fmt.Println(forwardHeaders)
-
 	p.forwardHeaders = forwardHeaders
 
 	p.srv = &http.Server{
