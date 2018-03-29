@@ -1,7 +1,7 @@
 POST API
 ========
 
-## build post-api
+## build postapi
 
 > Install go-spirit command before you build postapi
 
@@ -26,7 +26,7 @@ go install github.com/go-spirit/go-spirit
 > ./postapi list components
 - function: github.com/go-spirit/spirit/component/function.newComponentFunc
 - mns: github.com/go-spirit/spirit/component/mns.NewMNSComponent
-- post-api: github.com/spirit-component/postapi.NewPostAPI
+- postapi: github.com/spirit-component/postapi.NewPostAPI
 ```
 
 
@@ -54,9 +54,9 @@ components.mns.endpoint {
 	}
 }
 
-components.post-api.external.grapher.driver = default
+components.postapi.external.grapher.driver = default
 
-components.post-api.external.grapher.default = {
+components.postapi.external.grapher.default = {
 
 	todo-task-new {
 		name  = "todo.task.new"
@@ -69,7 +69,7 @@ components.post-api.external.grapher.default = {
 
 				response {
 					seq = 2
-					url = "spirit://actors/fbp/post-api/external?action=callback"
+					url = "spirit://actors/fbp/postapi/external?action=callback"
 				}
 			}
 
@@ -91,7 +91,7 @@ components.post-api.external.grapher.default = {
 
 				response {
 					seq = 4
-					url = "spirit://actors/fbp/post-api/external?action=callback"
+					url = "spirit://actors/fbp/postapi/external?action=callback"
 				}
 			}
 		}

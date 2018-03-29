@@ -22,7 +22,7 @@ func (p *PostAPI) loadCORS(router *gin.Engine, conf config.Configuration) {
 			return true
 		}
 
-		logrus.WithField("component", "post-api").WithField("alias", p.alias).Infoln("using default cors config")
+		logrus.WithField("component", "postapi").WithField("alias", p.alias).Infoln("using default cors config")
 	} else {
 		corsConf = cors.Config{
 			AllowOrigins:     conf.GetStringList("allow-origins"),
@@ -51,7 +51,7 @@ func (p *PostAPI) loadPprof(router *gin.Engine, conf config.Configuration) {
 		return
 	}
 
-	logrus.WithField("component", "post-api").WithField("alias", p.alias).Infoln("http.pprof enabled")
+	logrus.WithField("component", "postapi").WithField("alias", p.alias).Infoln("http.pprof enabled")
 
 	pprof.Register(router)
 	runtime.SetBlockProfileRate(int(conf.GetInt32("block-profile-rate", 0)))

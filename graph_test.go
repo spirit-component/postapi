@@ -14,7 +14,7 @@ todo-task-add {
 		
 		error {
 			to-queue {
-				url      = "spirit://actors/mns/sender?queue=post-api-error"
+				url      = "spirit://actors/mns/sender?queue=postapi-error"
 				metadata = {}
 			}
 		}
@@ -31,7 +31,7 @@ todo-task-add {
 			}
 
 			callback {
-				url      = "spirit://actors/mns/sender?queue=post-api-callback"
+				url      = "spirit://actors/mns/sender?queue=postapi-callback"
 				metadata = {}
 			}
 		}

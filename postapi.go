@@ -62,8 +62,8 @@ type PostAPI struct {
 }
 
 func init() {
-	component.RegisterComponent("post-api", NewPostAPI)
-	doc.RegisterDocumenter("post-api", &PostAPI{})
+	component.RegisterComponent("postapi", NewPostAPI)
+	doc.RegisterDocumenter("postapi", &PostAPI{})
 }
 
 func NewPostAPI(alias string, opts ...component.Option) (srv component.Component, err error) {
@@ -121,13 +121,13 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 		gin.SetMode("release")
 	}
 
-	urlPath := p.opts.Config.GetString("path", "/")
+	httpConf := p.opts.Config.GetConfig("http")
+
+	urlPath := httpConf.GetString("path", "/")
 
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.POST(urlPath, p.serve)
-
-	httpConf := p.opts.Config.GetConfig("http")
 
 	if httpConf == nil {
 		httpConf = config.NewConfig()
@@ -244,7 +244,7 @@ func (p *PostAPI) call(apiName string, body []byte, timeout time.Duration, c *gi
 
 	if err != nil {
 
-		logrus.WithField("component", "post-api").
+		logrus.WithField("component", "postapi").
 			WithField("alias", p.alias).
 			WithField("from", session.From()).
 			WithField("to", session.To()).
@@ -335,7 +335,7 @@ func (p *PostAPI) serve(c *gin.Context) {
 			},
 		)
 
-		logrus.WithField("component", "post-api").
+		logrus.WithField("component", "postapi").
 			WithField("alias", p.alias).
 			WithField("is-batch", isBatchCall).
 			WithField("X-Api", c.GetHeader(XApi)).
@@ -520,7 +520,7 @@ func (p *PostAPI) Start() error {
 		}
 
 		if err != http.ErrServerClosed {
-			logrus.WithField("component", "post-api").WithField("alias", p.alias).WithError(err).Errorln("Listen")
+			logrus.WithField("component", "postapi").WithField("alias", p.alias).WithError(err).Errorln("Listen")
 		}
 	}()
 	return nil
@@ -537,7 +537,7 @@ func (p *PostAPI) Stop() error {
 		return fmt.Errorf("postapi shutdown failure, err: %s", err)
 	}
 
-	logrus.WithField("component", "post-api").WithField("alias", p.alias).Infoln("Server exiting")
+	logrus.WithField("component", "postapi").WithField("alias", p.alias).Infoln("Server exiting")
 
 	return nil
 }

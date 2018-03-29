@@ -3,9 +3,9 @@
 ```hocon
 # .....
 # .....
-components.post-api.external.grapher.driver = templer
+components.postapi.external.grapher.driver = templer
 
-components.post-api.external.grapher.templer = {
+components.postapi.external.grapher.templer = {
 
 	default {
 		template = "graph.json"
@@ -25,7 +25,7 @@ components.post-api.external.grapher.templer = {
     "error": {
         "ports": [{
             "seq": 1,
-            "url": "spirit://actors/fbp/post-api/external?action=callback"
+            "url": "spirit://actors/fbp/postapi/external?action=callback"
         }]
     },
     "entrypoint": {
@@ -34,7 +34,7 @@ components.post-api.external.grapher.templer = {
             "url": "spirit://actors/fbp/goja/api-mock?action={{.api}}"
         },{
             "seq": 2,
-            "url": "spirit://actors/fbp/post-api/external?action=callback"
+            "url": "spirit://actors/fbp/postapi/external?action=callback"
         }]
     }
 }
