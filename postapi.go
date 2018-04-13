@@ -126,15 +126,17 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 	urlPath := httpConf.GetString("path", "/")
 
 	router := gin.New()
-	router.Use(gin.Recovery())
-	router.POST(urlPath, p.serve)
 
-	if httpConf == nil {
+	router.Use(gin.Recovery())
+
+	if httpConf.IsEmpty() {
 		httpConf = config.NewConfig()
 	}
 
 	p.loadCORS(router, httpConf.GetConfig("cors"))
 	p.loadPprof(router, httpConf.GetConfig("pprof"))
+
+	router.POST(urlPath, p.serve)
 
 	address := httpConf.GetString("address", ":8080")
 
