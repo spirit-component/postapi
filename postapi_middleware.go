@@ -14,7 +14,7 @@ import (
 func (p *PostAPI) loadCORS(router *gin.Engine, conf config.Configuration) {
 
 	var corsConf cors.Config
-	if conf == nil {
+	if conf.IsEmpty() {
 		corsConf = cors.DefaultConfig()
 		corsConf.AllowMethods = []string{"POST"}
 		corsConf.AllowOrigins = []string{"*"}
