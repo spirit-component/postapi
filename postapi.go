@@ -59,6 +59,8 @@ type PostAPI struct {
 	forwardHeaders []string
 
 	srv *http.Server
+
+	debug bool
 }
 
 func init() {
@@ -116,8 +118,8 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 
 	p.grapher = apiGrapher
 
-	debug := p.opts.Config.GetBoolean("debug", false)
-	if !debug {
+	p.debug = p.opts.Config.GetBoolean("debug", false)
+	if !p.debug {
 		gin.SetMode("release")
 	}
 
@@ -155,6 +157,13 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 func (p *PostAPI) call(apiName string, body []byte, timeout time.Duration, c *gin.Context) (resp *PostAPIResponse) {
 
 	graphs, exist := p.grapher.Query(apiName, c.Request.Header)
+
+	if p.debug && exist {
+
+		graphData, _ := json.Marshal(graphs)
+
+		logrus.WithField("api", apiName).WithField("graphs", string(graphData)).Debugln("Begin Call API")
+	}
 
 	if !exist {
 		resp = &PostAPIResponse{
@@ -453,6 +462,13 @@ func (p *PostAPI) serveSingleCall(c *gin.Context) (err error) {
 }
 
 func (p *PostAPI) callback(session mail.Session) (err error) {
+
+	if p.debug {
+		logrus.WithField("from", session.From()).
+			WithField("to", session.To()).
+			Debugln("Enter postapi callback")
+	}
+
 	fbp.BreakSession(session)
 
 	cacheKey := p.cacheKey(session.Payload().ID())
