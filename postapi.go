@@ -12,7 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gogap/config"
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/go-spirit/spirit/cache"
@@ -189,7 +189,7 @@ func (p *PostAPI) call(apiName string, body []byte, timeout time.Duration, c *gi
 
 	header["content-type"] = "application/json"
 
-	id := uuid.New()
+	id := uuid.New().String()
 	payload := &protocol.Payload{
 		Id:           id,
 		Timestamp:    time.Now().UnixNano(),
