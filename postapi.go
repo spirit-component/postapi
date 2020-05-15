@@ -135,6 +135,7 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 		httpConf = config.NewConfig()
 	}
 
+	p.loadGZip(router, httpConf.GetConfig("gzip"))
 	p.loadCORS(router, httpConf.GetConfig("cors"))
 	p.loadPprof(router, httpConf.GetConfig("pprof"))
 

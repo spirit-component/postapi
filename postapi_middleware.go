@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/gogap/config"
@@ -55,4 +56,34 @@ func (p *PostAPI) loadPprof(router *gin.Engine, conf config.Configuration) {
 
 	pprof.Register(router)
 	runtime.SetBlockProfileRate(int(conf.GetInt32("block-profile-rate", 0)))
+}
+
+func (p *PostAPI) loadGZip(router *gin.Engine, conf config.Configuration) {
+
+	if conf == nil {
+		return
+	}
+
+	if !conf.GetBoolean("enabled", true) {
+		return
+	}
+
+	logrus.WithField("component", "postapi").WithField("alias", p.alias).Infoln("gzip enabled")
+
+	compressLevel := conf.GetString("level", "default")
+
+	level := gzip.DefaultCompression
+
+	switch compressLevel {
+	case "best-compression":
+		{
+			level = gzip.BestCompression
+		}
+	case "best-speed":
+		{
+			level = gzip.BestSpeed
+		}
+	}
+
+	router.Use(gzip.Gzip(level))
 }
