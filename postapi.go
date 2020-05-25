@@ -491,7 +491,7 @@ func (p *PostAPI) callback(session mail.Session) (err error) {
 		return
 	}
 
-	payload, ok := session.Payload().Interface().(*protocol.Payload)
+	payload, ok := session.Payload().Copy().Interface().(*protocol.Payload)
 	if !ok {
 		err = errors.New("could not convert session payload to *protocol.Payload")
 		return
