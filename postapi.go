@@ -57,6 +57,7 @@ type PostAPI struct {
 	cache   cache.Cache
 
 	forwardHeaders []string
+	clientTimeout  time.Duration
 
 	srv *http.Server
 
@@ -138,6 +139,8 @@ func (p *PostAPI) init(opts ...component.Option) (err error) {
 	p.loadGZip(router, httpConf.GetConfig("gzip"))
 	p.loadCORS(router, httpConf.GetConfig("cors"))
 	p.loadPprof(router, httpConf.GetConfig("pprof"))
+
+	p.clientTimeout = httpConf.GetTimeDuration("client-timeout", time.Second*30)
 
 	router.POST(urlPath, p.serve)
 
@@ -391,7 +394,7 @@ func (p *PostAPI) serveBatchCall(c *gin.Context) (err error) {
 	}
 
 	strTimeout := c.GetHeader(XApiTimeout)
-	timeout := time.Second * 30
+	timeout := p.clientTimeout
 
 	if len(strTimeout) > 0 {
 		if dur, e := time.ParseDuration(strTimeout); e == nil {
